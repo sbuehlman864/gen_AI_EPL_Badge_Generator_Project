@@ -1,0 +1,11 @@
+# Credentials
+.env
+.kaggle/
+.venv/
+
+# Data
+data/
+
+# Docs
+main_description.md
+PROJECT_PLAN.md
