@@ -39,6 +39,81 @@ def download_dataset():
 
 
 # ---------------------------------------------------------------------------
+# Step 1b: Collect all image paths across all team folders
+# ---------------------------------------------------------------------------
+def collect_image_paths(logos_dir: Path) -> list[tuple[Path, str]]:
+    # Return a flat list of (image_path, team_name) tuples for every image
+    team_image_paths = []
+    # Loop through the logo directory in alpha order
+    for team_dir in sorted(logos_dir.iterdir()):
+        # Skip any loose files
+        if not team_dir.is_dir():
+            continue
+        # Sort any images (jpg, png) inside the team folder and combine into a list
+        images = sorted(team_dir.glob("*.jpg")) + sorted(team_dir.glob("*.png"))
+        if images:
+            # Loop over the images found for each team to pair them in a tuple with the team name and image path
+            for image in images:
+                team_image_paths.append((image, team_dir.name))
+    # We return our collected image paths
+    return team_image_paths
+
+
+# ---------------------------------------------------------------------------
+# Step 1c: Preprocess a single image (worker function for multiprocessing.Pool)
+# ---------------------------------------------------------------------------
+def preprocess_image(args: tuple[Path, str, Path]) -> None:
+    # Unpack args as (src_path, team_name, output_dir).
+    # Open the image with Pillow, convert to RGB, resize to 128x128
+    # using Image.LANCZOS, normalize pixel values to [0, 1] as a numpy
+    # array (divide by 255.0), then save the result to:
+    #   output_dir / team_name / src_path.name
+    # Create the output team subfolder if it does not exist.
+    # This function must be defined at module level (not nested) so that
+    # multiprocessing.Pool can pickle it.
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Step 1d: Run parallel preprocessing with multiprocessing.Pool
+# ---------------------------------------------------------------------------
+def preprocess_all_images(logos_dir: Path, output_dir: Path, num_workers: int = 4) -> None:
+    # Call collect_image_paths() to get all (src_path, team_name) pairs.
+    # Build the full args list as (src_path, team_name, output_dir) per image.
+    # Use multiprocessing.Pool(num_workers) with pool.map() to call
+    # preprocess_image() on every args tuple in parallel.
+    # Print progress before and after the pool completes.
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Step 1e: Split preprocessed images into train and validation sets
+# ---------------------------------------------------------------------------
+def split_train_val(preprocessed_dir: Path, val_fraction: float = 0.2) -> tuple[list[Path], list[Path]]:
+    # Gather all image files from preprocessed_dir recursively.
+    # Shuffle the list with a fixed random seed for reproducibility.
+    # Split into train and val lists using val_fraction as the cutoff.
+    # Return (train_paths, val_paths).
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Step 1f: Build PyTorch Dataset and DataLoaders
+# ---------------------------------------------------------------------------
+def build_dataloaders(train_paths: list[Path], val_paths: list[Path], batch_size: int = 32):
+    # Define an inner torch.utils.data.Dataset class that:
+    #   - Stores a list of image paths and a label-to-index mapping
+    #   - Derives the team label from each path's parent folder name
+    #   - Loads the preprocessed numpy array, converts it to a float32 tensor
+    #     in CHW format (channels-first), and returns (tensor, label_index)
+    # Instantiate Dataset objects for train and val splits.
+    # Wrap each in a torch.utils.data.DataLoader with the given batch_size,
+    # shuffle=True for train and shuffle=False for val.
+    # Return (train_loader, val_loader).
+    pass
+
+
+# ---------------------------------------------------------------------------
 # Step 2: Discover team folders and pick one sample image per team
 # ---------------------------------------------------------------------------
 def get_one_image_per_team(logos_dir: Path) -> dict[str, Path]:
@@ -92,5 +167,6 @@ if __name__ == "__main__":
         raise SystemExit(1)
 
     team_samples = get_one_image_per_team(LOGOS_DIR)
+    print(team_samples)
     print(f"Found {len(team_samples)} teams: {', '.join(team_samples)}")
     display_team_samples(team_samples)
