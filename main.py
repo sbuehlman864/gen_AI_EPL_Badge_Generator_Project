@@ -113,6 +113,8 @@ def build_dataloaders(train_paths: list[Path], val_paths: list[Path], batch_size
     pass
 
 
+# Code to initially view the data to understand what we are working with
+# 
 # ---------------------------------------------------------------------------
 # Step 2: Discover team folders and pick one sample image per team
 # ---------------------------------------------------------------------------
