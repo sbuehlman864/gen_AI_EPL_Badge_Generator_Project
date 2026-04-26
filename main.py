@@ -11,6 +11,7 @@ load_dotenv()
 from PIL import Image
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import numpy as np
 
 # ---------------------------------------------------------------------------
 # Config
@@ -63,15 +64,19 @@ def collect_image_paths(logos_dir: Path) -> list[tuple[Path, str]]:
 # Step 1c: Preprocess a single image (worker function for multiprocessing.Pool)
 # ---------------------------------------------------------------------------
 def preprocess_image(args: tuple[Path, str, Path]) -> None:
-    # Unpack args as (src_path, team_name, output_dir).
-    # Open the image with Pillow, convert to RGB, resize to 128x128
-    # using Image.LANCZOS, normalize pixel values to [0, 1] as a numpy
-    # array (divide by 255.0), then save the result to:
-    #   output_dir / team_name / src_path.name
-    # Create the output team subfolder if it does not exist.
-    # This function must be defined at module level (not nested) so that
-    # multiprocessing.Pool can pickle it.
-    pass
+    src_path, team_name, output_dir = args
+    # We open the image and convert to RGB
+    img = Image.open(src_path)
+    rgb_img = img.convert("RGB")
+    # We resize each image to 128 x 128 (chosen image size)
+    resized_img = rgb_img.resize((128,128), Image.LANCZOS)
+    # We normalize the image and convert to a numpy array
+    norm_img = np.asarray(resized_img) / 255.0
+    # We save the array as a file in a subfoler with the team name
+    out_dir = output_dir / team_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    np.save(out_dir / src_path.name, norm_img)
+    return
 
 
 # ---------------------------------------------------------------------------
