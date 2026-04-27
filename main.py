@@ -2,6 +2,7 @@
 # Main entry point for the EPL VAE logo fusion project.
 
 
+import multiprocessing
 import subprocess
 from pathlib import Path
 
@@ -83,12 +84,22 @@ def preprocess_image(args: tuple[Path, str, Path]) -> None:
 # Step 1d: Run parallel preprocessing with multiprocessing.Pool
 # ---------------------------------------------------------------------------
 def preprocess_all_images(logos_dir: Path, output_dir: Path, num_workers: int = 4) -> None:
-    # Call collect_image_paths() to get all (src_path, team_name) pairs.
     # Build the full args list as (src_path, team_name, output_dir) per image.
     # Use multiprocessing.Pool(num_workers) with pool.map() to call
     # preprocess_image() on every args tuple in parallel.
     # Print progress before and after the pool completes.
-    pass
+    # Collect all image paths and team names
+    team_image_paths = collect_image_paths(logos_dir)
+    # We build our args to grab the image path, team name, and output directory
+    args = [(img, team_name, output_dir) for img, team_name in team_image_paths]
+    # We use Pool to distribute the work and preprocess the images quicker
+    print("Start Pool")
+    with multiprocessing.Pool(processes=num_workers) as pool:
+        # We pass in our function and our args
+        pool.map(preprocess_image, args)
+    print("End Pool")
+
+    return
 
 
 # ---------------------------------------------------------------------------
