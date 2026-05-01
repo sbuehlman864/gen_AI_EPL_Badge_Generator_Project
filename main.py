@@ -14,6 +14,9 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
 
+from torch.utils.data import Dataset
+import torch
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -84,10 +87,6 @@ def preprocess_image(args: tuple[Path, str, Path]) -> None:
 # Step 1d: Run parallel preprocessing with multiprocessing.Pool
 # ---------------------------------------------------------------------------
 def preprocess_all_images(logos_dir: Path, output_dir: Path, num_workers: int = 4) -> None:
-    # Build the full args list as (src_path, team_name, output_dir) per image.
-    # Use multiprocessing.Pool(num_workers) with pool.map() to call
-    # preprocess_image() on every args tuple in parallel.
-    # Print progress before and after the pool completes.
     # Collect all image paths and team names
     team_image_paths = collect_image_paths(logos_dir)
     # We build our args to grab the image path, team name, and output directory
@@ -106,11 +105,17 @@ def preprocess_all_images(logos_dir: Path, output_dir: Path, num_workers: int = 
 # Step 1e: Split preprocessed images into train and validation sets
 # ---------------------------------------------------------------------------
 def split_train_val(preprocessed_dir: Path, val_fraction: float = 0.2) -> tuple[list[Path], list[Path]]:
-    # Gather all image files from preprocessed_dir recursively.
-    # Shuffle the list with a fixed random seed for reproducibility.
-    # Split into train and val lists using val_fraction as the cutoff.
-    # Return (train_paths, val_paths).
-    pass
+    # Gather image files from the preprocessed_dir using recursion
+    images = list(preprocessed_dir.rglob("*.npy"))
+    # Set our random seed and shuffle the images
+    np.random.seed(42)
+    np.random.shuffle(images)
+    # Find the count for how many validation images we will have
+    val_images = int(len(images)*val_fraction)
+    # Use the val_images count to split the data
+    val_paths = images[:val_images]
+    train_paths = images[val_images:]
+    return (train_paths, val_paths)
 
 
 # ---------------------------------------------------------------------------
