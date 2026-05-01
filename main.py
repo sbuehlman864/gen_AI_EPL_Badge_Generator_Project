@@ -144,6 +144,16 @@ def build_dataloaders(train_paths: list[Path], val_paths: list[Path], batch_size
             team_idx = self.team_names[team_name]
             return (img_chw, team_idx)
 
+    # Create train and validation datasets
+    train_dataset = eplDataset(train_paths)
+    val_dataset = eplDataset(val_paths)
+
+    # Create data loaders for train and validation
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=2) 
+    val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+
+    return (train_loader, val_loader)
+
 
 # Code to initially view the data to understand what we are working with
 # 
