@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import torch
 
 # ---------------------------------------------------------------------------
@@ -122,16 +122,27 @@ def split_train_val(preprocessed_dir: Path, val_fraction: float = 0.2) -> tuple[
 # Step 1f: Build PyTorch Dataset and DataLoaders
 # ---------------------------------------------------------------------------
 def build_dataloaders(train_paths: list[Path], val_paths: list[Path], batch_size: int = 32):
-    # Define an inner torch.utils.data.Dataset class that:
-    #   - Stores a list of image paths and a label-to-index mapping
-    #   - Derives the team label from each path's parent folder name
-    #   - Loads the preprocessed numpy array, converts it to a float32 tensor
-    #     in CHW format (channels-first), and returns (tensor, label_index)
-    # Instantiate Dataset objects for train and val splits.
-    # Wrap each in a torch.utils.data.DataLoader with the given batch_size,
-    # shuffle=True for train and shuffle=False for val.
-    # Return (train_loader, val_loader).
-    pass
+    class eplDataset(Dataset):
+        def __init__(self, paths):
+            self.paths = paths
+            # Sort team names
+            unique_teams = sorted(set(p.parent.name for p in paths))
+            # Map team names to index
+            self.team_names = {name: i for i, name in enumerate(unique_teams)}
+        
+        def __len__(self):
+            return len(self.paths)
+        
+        def __getitem__(self, index):
+            # Load in our image file, convert to a pytorch tensor
+            img_file = np.load(self.paths[index])
+            img = torch.tensor(img_file, dtype=torch.float32)
+            # Change from HWC to CHW 
+            img_chw = img.permute(2,0,1)
+            # Find the team name index
+            team_name = self.paths[index].parent.name
+            team_idx = self.team_names[team_name]
+            return (img_chw, team_idx)
 
 
 # Code to initially view the data to understand what we are working with
