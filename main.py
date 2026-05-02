@@ -191,8 +191,43 @@ class Encoder(torch.nn.Module):
         log_var = self.log_var(x)
         return mu, log_var
 
+class Decoder(torch.nn.Module):
+    def __init__(self, img_size, latent_dim):
+        super().__init__()
+        self.img_size = img_size
+        self.latent_dim = latent_dim
+        self.relu = torch.nn.ReLU()
+        self.sigmoid = torch.nn.Sigmoid()
+        self.linear1 = torch.nn.Linear(self.latent_dim, 16384)
+        self.up_sample1 = torch.nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.conv1 = torch.nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, padding=1)
+        self.up_sample2 = torch.nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.conv2 = torch.nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1)
+        self.up_sample3 = torch.nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.conv3 = torch.nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, padding=1)
+        self.up_sample4 = torch.nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.conv4 = torch.nn.Conv2d(in_channels=32, out_channels=3, kernel_size=3, padding=1)
+    
+    def forward(self, x):
+        x = self.linear1(x)
+        x = x.view(-1, 256, 8, 8) # Reshape from (batch_size, 16384) to (batch_size, 256, 8, 8)
+        x = self.up_sample1(x)
+        x = self.conv1(x)
+        x = self.relu(x)
+        x = self.up_sample2(x)
+        x = self.conv2(x)
+        x = self.relu(x)
+        x = self.up_sample3(x)
+        x = self.conv3(x)
+        x = self.relu(x)
+        x = self.up_sample4(x)
+        x = self.conv4(x)
+        x = self.sigmoid(x)
+        return x
+
+
 class VAE(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, img_size, latent_dim):
         
 
 
