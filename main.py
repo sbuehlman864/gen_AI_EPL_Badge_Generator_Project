@@ -5,8 +5,10 @@
 import multiprocessing
 import subprocess
 from pathlib import Path
+from turtle import forward
 
 from dotenv import load_dotenv
+from torch.nn.modules import activation
 load_dotenv() 
 
 from PIL import Image
@@ -67,13 +69,13 @@ def collect_image_paths(logos_dir: Path) -> list[tuple[Path, str]]:
 # ---------------------------------------------------------------------------
 # Step 1c: Preprocess a single image (worker function for multiprocessing.Pool)
 # ---------------------------------------------------------------------------
-def preprocess_image(args: tuple[Path, str, Path]) -> None:
+def preprocess_image(args: tuple[Path, str, Path], img_size) -> None:
     src_path, team_name, output_dir = args
     # We open the image and convert to RGB
     img = Image.open(src_path)
     rgb_img = img.convert("RGB")
     # We resize each image to 128 x 128 (chosen image size)
-    resized_img = rgb_img.resize((128,128), Image.LANCZOS)
+    resized_img = rgb_img.resize((img_size,img_size), Image.LANCZOS)
     # We normalize the image and convert to a numpy array
     norm_img = np.asarray(resized_img) / 255.0
     # We save the array as a file in a subfoler with the team name
@@ -86,7 +88,7 @@ def preprocess_image(args: tuple[Path, str, Path]) -> None:
 # ---------------------------------------------------------------------------
 # Step 1d: Run parallel preprocessing with multiprocessing.Pool
 # ---------------------------------------------------------------------------
-def preprocess_all_images(logos_dir: Path, output_dir: Path, num_workers: int = 4) -> None:
+def preprocess_all_images(logos_dir: Path, output_dir: Path, num_workers: int = 4, img_size: int = 128) -> None:
     # Collect all image paths and team names
     team_image_paths = collect_image_paths(logos_dir)
     # We build our args to grab the image path, team name, and output directory
@@ -95,7 +97,7 @@ def preprocess_all_images(logos_dir: Path, output_dir: Path, num_workers: int = 
     print("Start Pool")
     with multiprocessing.Pool(processes=num_workers) as pool:
         # We pass in our function and our args
-        pool.map(preprocess_image, args)
+        pool.map(preprocess_image, args, img_size)
     print("End Pool")
 
     return
@@ -161,7 +163,37 @@ def build_dataloaders(train_paths: list[Path], val_paths: list[Path], batch_size
 # Step 2: VAE Architecture and Training
 # ---------------------------------------------------------------------------
 
+class Encoder(torch.nn.Module):
+    def __init__(self, img_size, latent_dim) -> None:
+        super().__init__()
+        self.img_size = img_size
+        self.latent_dim = latent_dim
+        self.conv1 = torch.nn.Conv2d(in_channels=3,out_channels=32, kernel_size=3, stride=2, padding=1)
+        self.conv2 = torch.nn.Conv2d(in_channels=32,out_channels=64, kernel_size=3, stride=2, padding=1)
+        self.conv3 = torch.nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=2, padding=1)
+        self.conv4 = torch.nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=2, padding=1)
+        self.activation = torch.nn.ReLU()
+        self.flatten = torch.nn.Flatten(start_dim=1) # Flatten from (batch_size,256, 8, 8) to (batch_size, 16384)
+        self.mu = torch.nn.Linear(16384, self.latent_dim)
+        self.log_var = torch.nn.Linear(16384, self.latent_dim)
+    
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.activation(x)
+        x = self.conv2(x)
+        x = self.activation(x)
+        x = self.conv3(x)
+        x = self.activation(x)
+        x = self.conv4(x)
+        x = self.activation(x)
+        x = self.flatten(x)
+        mu = self.mu(x)
+        log_var = self.log_var(x)
+        return mu, log_var
 
+class VAE(torch.nn.Module):
+    def __init__(self):
+        
 
 
 # ---------------------------------------------------------------------------
