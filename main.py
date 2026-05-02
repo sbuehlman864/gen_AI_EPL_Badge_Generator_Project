@@ -228,7 +228,23 @@ class Decoder(torch.nn.Module):
 
 class VAE(torch.nn.Module):
     def __init__(self, img_size, latent_dim):
-        
+        super().__init__()
+        self.img_size = img_size
+        self.latent_dim = latent_dim
+        self.encoder = Encoder(self.img_size, self.latent_dim)
+        self.decoder = Decoder(self.img_size, self.latent_dim)
+    
+    def reparameterize(self, mu, log_var):
+        epsilon = torch.randn_like(mu) # epsilon as random value sampled from a normal distribution in the shape of mu
+        std = torch.exp(0.5 * log_var)
+        z = mu + epsilon * std
+        return z
+    
+    def forward(self, x):
+        mu, log_var = self.encoder(x)
+        z = self.reparameterize(mu, log_var)
+        reconstructed_img = self.decoder(z)
+        return (reconstructed_img, mu, log_var)
 
 
 # ---------------------------------------------------------------------------
