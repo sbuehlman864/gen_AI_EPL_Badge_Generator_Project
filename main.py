@@ -390,8 +390,8 @@ def encode_train_images(model, train_loader):
         for batch in train_loader:
             images = batch[0].to(device)
             mu, log_var = model.encoder(images)
-            mus.append(mu.cpu().np())
-            labels.append(batch[1].np())
+            mus.append(mu.cpu().numpy())
+            labels.append(batch[1].numpy())
         
         mus = np.concatenate(mus, axis=0)
         labels = np.concatenate(labels, axis=0)
@@ -418,6 +418,17 @@ def umap_visual(mus, labels):
     plt.ylabel('UMAP 2')
     plt.show()
 
+def interpolate_centroids(centroid_a, centroid_b, alpha=0.5):
+    z = (1 - alpha) * centroid_a + alpha * centroid_b
+    return z
+
+def generate_combined_img(model, z):
+    z = torch.tensor(z, dtype=torch.float32) # Convert from np array to torch tensor
+    z = z.unsqueeze(0) # Unsqueeze to shape (batch_size, latent_dim)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    z = z.to(device)
+    combined_img = (model.decoder(z)).squeeze(0).permute(1, 2, 0).cpu().numpy() # Convert back to numpy
+    return combined_img
 
 
 
