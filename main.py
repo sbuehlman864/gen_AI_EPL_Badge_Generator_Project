@@ -378,6 +378,24 @@ def save_best_hparams(best_config, output_path):
 # Step 4: Latent Space Exploration
 # ---------------------------------------------------------------------------
 
+def encode_train_images(model, train_loader):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.eval()
+
+    mus = []
+    labels = []
+    with torch.no_grad():
+        for batch in train_loader:
+            images = batch[0].to(device)
+            mu, log_var = model.encoder(images)
+            mus.append(mu.cpu().np())
+            labels.append(batch[1].np())
+        
+        mus = np.concatenate(mus, axis=0)
+        labels = np.concatenate(labels, axis=0)
+    
+    return (mus, labels)
+
 
 
 
