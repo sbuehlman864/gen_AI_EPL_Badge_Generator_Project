@@ -253,6 +253,10 @@ class VAE(torch.nn.Module):
 
 
 def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoint_every=5, report_to_ray=False):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = model.to(device)
+
     train_losses = []
     val_losses = []
 
@@ -263,8 +267,9 @@ def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoi
         model.train()
         for batch in train_loader:
             optimizer.zero_grad()
-            (reconstruction, mu, log_var) = model(batch[0])
-            recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, batch[0])
+            images = batch[0].to(device)
+            (reconstruction, mu, log_var) = model(images)
+            recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, images)
             kl_loss = -0.5 * torch.mean(torch.sum(1 + log_var - torch.square(mu) - torch.exp(log_var), dim=1)) # torch.mean makes sure scale does not change across batches
             train_loss = recon_loss + beta * kl_loss
             
@@ -282,8 +287,9 @@ def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoi
         model.eval()
         with torch.no_grad():
             for batch in val_loader:
-                (reconstruction, mu, log_var) = model(batch[0])
-                recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, batch[0])
+                images = batch[0].to(device)
+                (reconstruction, mu, log_var) = model(images)
+                recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, images)
                 kl_loss = -0.5 * torch.mean(torch.sum(1 + log_var - torch.square(mu) - torch.exp(log_var), dim=1))
                 val_loss = recon_loss + beta * kl_loss
                 total_val_loss += val_loss.item()
