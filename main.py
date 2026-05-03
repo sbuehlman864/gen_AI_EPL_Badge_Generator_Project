@@ -5,10 +5,8 @@
 import multiprocessing
 import subprocess
 from pathlib import Path
-from turtle import forward
 
 from dotenv import load_dotenv
-from torch.nn.modules import activation
 load_dotenv() 
 
 from PIL import Image
@@ -18,6 +16,8 @@ import numpy as np
 
 from torch.utils.data import Dataset, DataLoader
 import torch
+
+from ray import tune
 
 # ---------------------------------------------------------------------------
 # Config
@@ -301,7 +301,13 @@ def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoi
 # Step 3: Hyperband Hyperparameter Tuning
 # ---------------------------------------------------------------------------
 def define_search_space():
-    return
+    config = {
+        "latent_dim": tune.choice([64, 128, 256, 512]),
+        "beta": tune.uniform(0.5, 5.0),
+        "lr": tune.loguniform(1e-4, 1e-2),
+        "batch_size": tune.choice([16, 32, 64])
+    }
+    return config
 
 
 def train_trial(config):
