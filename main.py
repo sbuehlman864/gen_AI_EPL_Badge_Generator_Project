@@ -508,4 +508,13 @@ if __name__ == "__main__":
 
     plot_loss_curves(train_losses, val_losses)
 
-    
+    mus, labels = encode_train_images(vae_model, train_loader)
+    centroids = compute_centroids(mus, labels)
+    umap_visual(mus, labels)
+
+    centroid_a = centroids[0]
+    centroid_b = centroids[1]
+    z = interpolate_centroids(centroid_a, centroid_b, 0.5)
+    combined_img = generate_combined_img(vae_model, z)
+    plt.imshow(combined_img)
+    plt.show()
