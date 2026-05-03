@@ -336,7 +336,13 @@ def train_trial(config, data_path, img_size, epochs):
 
 
 def run_hyperband(num_samples, max_epochs, reduction_factor, data_path, img_size):
-    scheduler = ray.tune.schedulers.HyperBandScheduler(time_attr="training_iteration", max_t=max_epochs, reduction_factor=reduction_factor)
+    scheduler = ray.tune.schedulers.HyperBandScheduler(
+        time_attr="training_iteration",
+        max_t=max_epochs,
+        reduction_factor=reduction_factor,
+        metric="val_loss",
+        mode="min"
+    )
     tuner = tune.Tuner(
         tune.with_parameters(train_trial, data_path=data_path, img_size=img_size, epochs=max_epochs),
         param_space=define_search_space(),
