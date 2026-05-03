@@ -351,6 +351,9 @@ def run_hyperband(num_samples, max_epochs, reduction_factor, data_path, img_size
         tune_config=tune.TuneConfig(num_samples=num_samples, scheduler=scheduler)
     )
     results = tuner.fit()
+    for result in results:
+        if result.error:
+            print(f"Trial error: {result.error}")
     return results.get_best_result(metric="val_loss", mode="min", filter_nan_and_inf=False)
 
 
