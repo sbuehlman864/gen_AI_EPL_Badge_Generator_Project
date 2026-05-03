@@ -252,7 +252,7 @@ class VAE(torch.nn.Module):
         return (reconstructed_img, mu, log_var)
 
 
-def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoint_every=5, report_to_ray=False):
+def train(model, train_loader, val_loader, optimizer, epochs, scheduler, beta=1.0, checkpoint_every=5, report_to_ray=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = model.to(device)
@@ -303,6 +303,10 @@ def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoi
             ray.tune.report({"val_loss": total_val_loss / len(val_loader)})
 
         else:
+            
+            if scheduler is not None:
+                scheduler.step(total_val_loss / len(val_loader))
+
             print(f"----Epoch {epoch}----")
             print(f"Avg Train Loss: {total_train_loss / len(train_loader)}")
             print(f"Avg Val Loss: {total_val_loss / len(val_loader)}")
@@ -443,10 +447,13 @@ if __name__ == "__main__":
     (train_loader, val_loader) = build_dataloaders(train_paths, val_paths, batch_size)
 
     vae_model = VAE(IMG_SIZE, latent_dim)
+    
 
     optimizer = torch.optim.Adam(vae_model.parameters(), lr=lr)
 
-    train_losses, val_losses = train(vae_model, train_loader, val_loader, optimizer, epochs, beta, checkpoint_every=5, report_to_ray=False)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+
+    train_losses, val_losses = train(vae_model, train_loader, val_loader, optimizer, epochs, scheduler, beta, checkpoint_every=5, report_to_ray=False)
 
     plot_loss_curves(train_losses, val_losses)
 
