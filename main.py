@@ -23,6 +23,8 @@ from ray import tune
 import ray
 from ray import train as ray_train
 
+import umap
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -395,6 +397,26 @@ def encode_train_images(model, train_loader):
         labels = np.concatenate(labels, axis=0)
     
     return (mus, labels)
+
+def compute_centroids(mus, labels):
+    unique_labels = np.unique(labels)
+    centroids = {}
+
+    for label in unique_labels:
+        mask = labels == label
+        centroids[label] = mus[mask].mean(axis=0) # Select all mu vectors where labels match and take the mean
+    
+    return centroids
+
+def umap_visual(mus, labels):
+    embedding = umap.UMAP(n_components=2).fit_transform(mus) # Reduce latent dimension down to 2D, shape of (num_images, 2)
+    plt.figure(figsize=(10, 8))
+    plt.scatter(embedding[:, 0], embedding[:, 1], c=labels, cmap='tab20', s=5)
+    plt.colorbar(label='Team')
+    plt.title('UMAP Latent Space')
+    plt.xlabel('UMAP 1')
+    plt.ylabel('UMAP 2')
+    plt.show()
 
 
 
