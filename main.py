@@ -28,6 +28,8 @@ import ray
 DATASET_SLUG = "alexteboul/english-premier-league-logo-detection-20k-images"
 DATA_DIR = Path("data")
 LOGOS_DIR = DATA_DIR / "epl-logos-big" / "epl-logos-big"
+OUTPUT_PATH = Path("preprocessed_imgs")
+IMG_SIZE = 128
 
 
 # ---------------------------------------------------------------------------
@@ -352,8 +354,6 @@ def save_best_hparams(best_config, output_path):
         json.dump(best_config, file)
     return
 
-
-
 # ---------------------------------------------------------------------------
 # Step 4: Latent Space Exploration
 # ---------------------------------------------------------------------------
@@ -371,46 +371,21 @@ def save_best_hparams(best_config, output_path):
 # ---------------------------------------------------------------------------
 
 
-# Code to initially view the data to understand what we are working with
-# 
 # ---------------------------------------------------------------------------
-# Step 2: Discover team folders and pick one sample image per team
+# Visualizations
 # ---------------------------------------------------------------------------
-def get_one_image_per_team(logos_dir: Path) -> dict[str, Path]:
-    team_samples = {}
-    for team_dir in sorted(logos_dir.iterdir()):
-        if not team_dir.is_dir():
-            continue
-        images = sorted(team_dir.glob("*.jpg")) + sorted(team_dir.glob("*.png"))
-        if images:
-            team_samples[team_dir.name] = images[0]
-    return team_samples
-
-
-# ---------------------------------------------------------------------------
-# Step 3: Display one image per team in a grid
-# ---------------------------------------------------------------------------
-def display_team_samples(team_samples: dict[str, Path]):
-    n = len(team_samples)
-    cols = 5
-    rows = 4
-
-    fig = plt.figure(figsize=(cols * 3, rows * 3))
-    fig.suptitle("EPL Logos — One Sample Per Team", fontsize=16, fontweight="bold")
-    gs = gridspec.GridSpec(rows, cols, figure=fig, hspace=0.4, wspace=0.3)
-
-    for idx, (team_name, img_path) in enumerate(team_samples.items()):
-        ax = fig.add_subplot(gs[idx // cols, idx % cols])
-        img = Image.open(img_path).convert("RGB")
-        ax.imshow(img)
-        ax.set_title(team_name.replace("-", " ").title(), fontsize=9)
-        ax.axis("off")
-
-    # Hide any unused subplot cells
-    for idx in range(n, rows * cols):
-        fig.add_subplot(gs[idx // cols, idx % cols]).axis("off")
-
+def plot_loss_curves(train_losses, val_losses):
+    epochs = range(1, len(train_losses) + 1)
+    plt.figure(figsize=(10, 5))
+    plt.plot(epochs, train_losses, label="Train Loss")
+    plt.plot(epochs, val_losses, label="Val Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Training and Validation Loss")
+    plt.legend()
+    plt.tight_layout()
     plt.show()
+
 
 
 # ---------------------------------------------------------------------------
@@ -425,8 +400,38 @@ if __name__ == "__main__":
         for p in sorted(DATA_DIR.rglob("*"))[:30]:
             print(" ", p)
         raise SystemExit(1)
+    
+    OUTPUT_PATH.mkdir(exist_ok=True)
 
-    team_samples = get_one_image_per_team(LOGOS_DIR)
-    print(team_samples)
-    print(f"Found {len(team_samples)} teams: {', '.join(team_samples)}")
-    display_team_samples(team_samples)
+    preprocess_all_images(LOGOS_DIR, OUTPUT_PATH, num_workers=4, img_size=IMG_SIZE)
+
+    # Hyperband Hyperparameters
+    num_samples = 5
+    max_epochs = 5
+    reduction_factor = 3
+    
+    best_hparams = run_hyperband(num_samples, max_epochs, reduction_factor, OUTPUT_PATH, IMG_SIZE)
+    save_best_hparams(best_hparams, "./best_hparams.json")
+
+    with open("best_hparams.json", "r") as f:
+        best = json.load(f)
+
+    latent_dim = best["latent_dim"]
+    beta = best["beta"]
+    lr = best["lr"]
+    batch_size = best["batch_size"]
+
+    epochs = 50
+    
+    (train_paths, val_paths) = split_train_val(OUTPUT_PATH, 0.2)
+    (train_loader, val_loader) = build_dataloaders(train_paths, val_paths, batch_size)
+
+    vae_model = VAE(IMG_SIZE, latent_dim)
+
+    optimizer = torch.optim.Adam(vae_model.parameters(), lr=lr)
+
+    train_losses, val_losses = train(vae_model, train_loader, val_loader, optimizer, epochs, beta, checkpoint_every=5, report_to_ray=False)
+
+    plot_loss_curves(train_losses, val_losses)
+
+    
