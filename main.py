@@ -247,9 +247,11 @@ class VAE(torch.nn.Module):
         return (reconstructed_img, mu, log_var)
 
 
-def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0):
+def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoint_every=5):
     train_losses = []
     val_losses = []
+
+    Path("model_checkpoints").mkdir(exist_ok=True)
 
     for epoch in range(epochs):
         total_train_loss = 0
@@ -264,8 +266,12 @@ def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0):
             train_loss.backward()
             optimizer.step()
 
+            
+
             total_train_loss += train_loss.item()
         
+        if (epoch + 1) % checkpoint_every == 0:
+                torch.save(model.state_dict(), f"model_checkpoints/model_weights_{epoch}.pt") # Save model weights every checkpoint_every epochs
         total_val_loss = 0
         model.eval()
         with torch.no_grad():
@@ -283,7 +289,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0):
         val_losses.append(total_val_loss / len(val_loader)) # save average validation losses per epoch
         print(f"----Epoch {epoch}----")
         print(f"Avg Train Loss: {total_train_loss / len(train_loader)}")
-        print(f"Avg Val Loss: {total_train_loss / len(train_loader)}")
+        print(f"Avg Val Loss: {total_train_loss / len(val_loader)}")
         print("----------------------------")
 
     return train_losses, val_losses
