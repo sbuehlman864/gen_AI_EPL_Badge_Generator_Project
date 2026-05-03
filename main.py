@@ -21,6 +21,7 @@ import torch
 
 from ray import tune
 import ray
+from ray import train as ray_train
 
 # ---------------------------------------------------------------------------
 # Config
@@ -293,7 +294,8 @@ def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoi
         val_losses.append(total_val_loss / len(val_loader)) # save average validation losses per epoch
 
         if report_to_ray:
-            ray.train.report({"val_loss": total_val_loss / len(val_loader)})
+            ray_train.report({"val_loss": total_val_loss / len(val_loader)})
+
         else:
             print(f"----Epoch {epoch}----")
             print(f"Avg Train Loss: {total_train_loss / len(train_loader)}")
