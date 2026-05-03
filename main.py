@@ -247,6 +247,50 @@ class VAE(torch.nn.Module):
         return (reconstructed_img, mu, log_var)
 
 
+def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0):
+    train_losses = []
+    val_losses = []
+
+    for epoch in range(epochs):
+        total_train_loss = 0
+        model.train()
+        for batch in train_loader:
+            optimizer.zero_grad()
+            (reconstruction, mu, log_var) = model(batch[0])
+            recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, batch[0])
+            kl_loss = -0.5 * torch.mean(torch.sum(1 + log_var - torch.square(mu) - torch.exp(log_var), dim=1)) # torch.mean makes sure scale does not change across batches
+            train_loss = recon_loss + beta * kl_loss
+            
+            train_loss.backward()
+            optimizer.step()
+
+            total_train_loss += train_loss.item()
+        
+        total_val_loss = 0
+        model.eval()
+        with torch.no_grad():
+            for batch in val_loader:
+                (reconstruction, mu, log_var) = model(batch[0])
+                recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, batch[0])
+                kl_loss = -0.5 * torch.mean(torch.sum(1 + log_var - torch.square(mu) - torch.exp(log_var), dim=1))
+                val_loss = recon_loss + beta * kl_loss
+                total_val_loss += val_loss.item()
+            
+
+
+
+        train_losses.append(total_train_loss / len(train_loader)) # save average train losses per epoch
+        val_losses.append(total_val_loss / len(val_loader)) # save average validation losses per epoch
+        print(f"----Epoch {epoch}----")
+        print(f"Avg Train Loss: {total_train_loss / len(train_loader)}")
+        print(f"Avg Val Loss: {total_train_loss / len(train_loader)}")
+        print("----------------------------")
+
+    return train_losses, val_losses
+
+
+
+
 # ---------------------------------------------------------------------------
 # Step 3: Hyperband Hyperparameter Tuning
 # ---------------------------------------------------------------------------
