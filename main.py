@@ -6,6 +6,7 @@ import multiprocessing
 from multiprocessing import reduction
 import subprocess
 from pathlib import Path
+import json
 
 from dotenv import load_dotenv
 load_dotenv() 
@@ -334,10 +335,21 @@ def train_trial(config, data_path, img_size, epochs):
 
 
 def run_hyperband(num_samples, max_epochs, reduction_factor, data_path, img_size):
-    return
+    scheduler = ray.tune.schedulers.HyperBandScheduler(time_attr="training_iteration", max_t=max_epochs, reduction_factor=reduction_factor)
+    tuner = tune.Tuner(
+        tune.with_parameters(train_trial, data_path=data_path, img_size=img_size, epochs=max_epochs),
+        param_space=define_search_space(),
+        tune_config=tune.TuneConfig(num_samples=num_samples, scheduler=scheduler)
+    )
+    results = tuner.fit()
+    return results.get_best_result(metric="val_loss", mode="min")
 
 
 def save_best_hparams(best_config, output_path):
+    best_config = best_config.config
+
+    with open(output_path, "w") as file:
+        json.dump(best_config, file)
     return
 
 
