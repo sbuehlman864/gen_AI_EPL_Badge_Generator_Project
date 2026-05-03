@@ -74,8 +74,8 @@ def collect_image_paths(logos_dir: Path) -> list[tuple[Path, str]]:
 # ---------------------------------------------------------------------------
 # Step 1c: Preprocess a single image (worker function for multiprocessing.Pool)
 # ---------------------------------------------------------------------------
-def preprocess_image(args: tuple[Path, str, Path], img_size) -> None:
-    src_path, team_name, output_dir = args
+def preprocess_image(data_tuple) -> None:
+    src_path, team_name, output_dir, img_size = data_tuple
     # We open the image and convert to RGB
     img = Image.open(src_path)
     rgb_img = img.convert("RGB")
@@ -96,15 +96,14 @@ def preprocess_image(args: tuple[Path, str, Path], img_size) -> None:
 def preprocess_all_images(logos_dir: Path, output_dir: Path, num_workers: int = 4, img_size: int = 128) -> None:
     # Collect all image paths and team names
     team_image_paths = collect_image_paths(logos_dir)
-    # We build our args to grab the image path, team name, and output directory
-    args = [(img, team_name, output_dir) for img, team_name in team_image_paths]
+    # We build our args to grab the image path, team name, output directory, and img_size
+    args_for_pool = [(img, team_name, output_dir, img_size) for img, team_name in team_image_paths]
     # We use Pool to distribute the work and preprocess the images quicker
     print("Start Pool")
     with multiprocessing.Pool(processes=num_workers) as pool:
-        # We pass in our function and our args
-        pool.map(preprocess_image, args, img_size)
+        # We pass in our function and our args_for_pool.
+        pool.map(preprocess_image, args_for_pool)
     print("End Pool")
-
     return
 
 
@@ -422,7 +421,7 @@ if __name__ == "__main__":
     batch_size = best["batch_size"]
 
     epochs = 50
-    
+
     (train_paths, val_paths) = split_train_val(OUTPUT_PATH, 0.2)
     (train_loader, val_loader) = build_dataloaders(train_paths, val_paths, batch_size)
 
