@@ -3,6 +3,7 @@
 
 
 import multiprocessing
+from multiprocessing import reduction
 import subprocess
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 
 from ray import tune
+import ray
 
 # ---------------------------------------------------------------------------
 # Config
@@ -247,7 +249,7 @@ class VAE(torch.nn.Module):
         return (reconstructed_img, mu, log_var)
 
 
-def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoint_every=5):
+def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoint_every=5, report_to_ray=False):
     train_losses = []
     val_losses = []
 
@@ -270,8 +272,9 @@ def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoi
 
             total_train_loss += train_loss.item()
         
-        if (epoch + 1) % checkpoint_every == 0:
-                torch.save(model.state_dict(), f"model_checkpoints/model_weights_{epoch}.pt") # Save model weights every checkpoint_every epochs
+        if checkpoint_every > 0:
+            if (epoch + 1) % checkpoint_every == 0:
+                    torch.save(model.state_dict(), f"model_checkpoints/model_weights_{epoch}.pt") # Save model weights every checkpoint_every epochs
         total_val_loss = 0
         model.eval()
         with torch.no_grad():
@@ -284,13 +287,16 @@ def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoi
             
 
 
-
         train_losses.append(total_train_loss / len(train_loader)) # save average train losses per epoch
         val_losses.append(total_val_loss / len(val_loader)) # save average validation losses per epoch
-        print(f"----Epoch {epoch}----")
-        print(f"Avg Train Loss: {total_train_loss / len(train_loader)}")
-        print(f"Avg Val Loss: {total_train_loss / len(val_loader)}")
-        print("----------------------------")
+
+        if report_to_ray:
+            ray.train.report({"val_loss": total_val_loss / len(val_loader)})
+        else:
+            print(f"----Epoch {epoch}----")
+            print(f"Avg Train Loss: {total_train_loss / len(train_loader)}")
+            print(f"Avg Val Loss: {total_val_loss / len(val_loader)}")
+            print("----------------------------")
 
     return train_losses, val_losses
 
@@ -310,11 +316,24 @@ def define_search_space():
     return config
 
 
-def train_trial(config):
+def train_trial(config, data_path, img_size, epochs):
+    latent_dim = config["latent_dim"]
+    beta = config["beta"]
+    lr = config["lr"]
+    batch_size = config["batch_size"]
+
+    (train_paths, val_paths) = split_train_val(data_path, 0.2)
+    (train_loader, val_loader) = build_dataloaders(train_paths, val_paths, batch_size)
+
+    vae_model = VAE(img_size, latent_dim)
+
+    optimizer = torch.optim.Adam(vae_model.parameters(),lr)
+
+    train_losses, val_losses = train(vae_model, train_loader, val_loader, optimizer, epochs, beta, checkpoint_every=-1,report_to_ray=True)
     return
 
 
-def run_hyperband(num_samples, max_epochs, reduction_factor):
+def run_hyperband(num_samples, max_epochs, reduction_factor, data_path, img_size):
     return
 
 
