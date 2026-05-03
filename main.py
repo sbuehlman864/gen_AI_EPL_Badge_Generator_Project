@@ -29,7 +29,7 @@ from ray import train as ray_train
 DATASET_SLUG = "alexteboul/english-premier-league-logo-detection-20k-images"
 DATA_DIR = Path("data")
 LOGOS_DIR = DATA_DIR / "epl-logos-big" / "epl-logos-big"
-OUTPUT_PATH = Path("preprocessed_imgs")
+OUTPUT_PATH = Path("preprocessed_imgs").resolve()
 IMG_SIZE = 128
 
 
