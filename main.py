@@ -300,7 +300,20 @@ def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoi
 # ---------------------------------------------------------------------------
 # Step 3: Hyperband Hyperparameter Tuning
 # ---------------------------------------------------------------------------
+def define_search_space():
+    return
 
+
+def train_trial(config):
+    return
+
+
+def run_hyperband(num_samples, max_epochs, reduction_factor):
+    return
+
+
+def save_best_hparams(best_config, output_path):
+    return
 
 
 
