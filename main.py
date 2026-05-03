@@ -300,7 +300,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, beta=1.0, checkpoi
         val_losses.append(total_val_loss / len(val_loader)) # save average validation losses per epoch
 
         if report_to_ray:
-            ray_train.report({"val_loss": total_val_loss / len(val_loader)})
+            ray.tune.report({"val_loss": total_val_loss / len(val_loader)})
 
         else:
             print(f"----Epoch {epoch}----")
