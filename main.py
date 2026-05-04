@@ -427,7 +427,7 @@ def generate_combined_img(model, z):
     z = z.unsqueeze(0) # Unsqueeze to shape (batch_size, latent_dim)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     z = z.to(device)
-    combined_img = (model.decoder(z)).squeeze(0).permute(1, 2, 0).cpu().numpy() # Convert back to numpy
+    combined_img = (model.decoder(z)).squeeze(0).permute(1, 2, 0).cpu().detach().numpy() # Convert back to numpy
     return combined_img
 
 
