@@ -550,6 +550,17 @@ def get_team_name_mapping(preprocessed_dir):
     return {name: i for i, name in enumerate(unique_teams)}
 
 
+def generate_fusion_gradio(team_names, team_a, team_b, alpha):
+    # Main backend function for the GUI
+    # Takes list of team names, team a and b, and the alpha and returns interpolated image
+    idx_a = team_names[team_a]
+    idx_b = team_names[team_b]
+    centroid_a = centroids[idx_a]
+    centroid_b = centroids[idx_b]
+    z = interpolate_centroids(centroid_a, centroid_b, alpha)
+    img = generate_combined_img(vae_model, z)
+    return img
+
 
 
 # ---------------------------------------------------------------------------
