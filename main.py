@@ -433,7 +433,9 @@ def train_trial(config, data_path, img_size, epochs):
 
     optimizer = torch.optim.Adam(vae_model.parameters(),lr)
 
-    train_losses, val_losses = train(vae_model, train_loader, val_loader, optimizer, epochs, beta, checkpoint_every=-1,report_to_ray=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+
+    train_losses, val_losses = train(vae_model, train_loader, val_loader, optimizer, epochs, scheduler, beta, checkpoint_every=-1,report_to_ray=True)
     return
 
 
