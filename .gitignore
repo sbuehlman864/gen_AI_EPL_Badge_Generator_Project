@@ -5,6 +5,7 @@
 
 # Data
 data/
+preprocessed_imgs/
 
 # Docs
 main_description.md
