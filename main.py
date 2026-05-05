@@ -300,7 +300,7 @@ class Decoder_large(torch.nn.Module):
     
     def forward(self, x):
         x = self.linear1(x)
-        x = x.view(-1, 256, 8, 8) # Reshape from (batch_size, 16384) to (batch_size, 256, 8, 8)
+        x = x.view(-1, 512, 8, 8) # Reshape from (batch_size, 32768) to (batch_size, 512, 8, 8)
         x = self.up_sample1(x)
         x = self.conv1(x)
         x = self.relu(x)
