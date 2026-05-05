@@ -273,7 +273,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, scheduler, beta=1.
             (reconstruction, mu, log_var) = model(images)
             recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, images, reduction='sum')
             kl_loss = -0.5 * torch.mean(torch.sum(1 + log_var - torch.square(mu) - torch.exp(log_var), dim=1)) # torch.mean makes sure scale does not change across batches
-            if epoch <= 25:
+            if epoch <= 100:
               train_loss = recon_loss
             else:
               train_loss = recon_loss + beta * kl_loss
@@ -296,7 +296,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, scheduler, beta=1.
                 (reconstruction, mu, log_var) = model(images)
                 recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, images, reduction='sum')
                 kl_loss = -0.5 * torch.mean(torch.sum(1 + log_var - torch.square(mu) - torch.exp(log_var), dim=1))
-                if epoch <= 25:
+                if epoch <= 100:
                   val_loss = recon_loss
                 else:
                   val_loss = recon_loss + beta * kl_loss
