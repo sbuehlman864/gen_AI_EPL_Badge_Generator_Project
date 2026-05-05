@@ -86,7 +86,7 @@ def preprocess_image(data_tuple) -> None:
     resized_img = rgb_img.resize((img_size,img_size), Image.LANCZOS)
     # We normalize the image and convert to a numpy array
     norm_img = np.asarray(resized_img) / 255.0
-    # We save the array as a file in a subfoler with the team name
+    # We save the array as a file in a subfolder with the team name
     out_dir = output_dir / team_name
     out_dir.mkdir(parents=True, exist_ok=True)
     np.save(out_dir / src_path.name, norm_img)
@@ -543,6 +543,12 @@ def generate_combined_img(model, z):
 # ---------------------------------------------------------------------------
 # Step 5: GUI
 # ---------------------------------------------------------------------------
+
+def get_team_name_mapping(preprocessed_dir):
+    # Helper function to map each team name to index label
+    unique_teams = sorted(set(p.parent.name for p in preprocessed_dir.rglob("*.npy")))
+    return {name: i for i, name in enumerate(unique_teams)}
+
 
 
 
