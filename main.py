@@ -25,6 +25,8 @@ from ray import train as ray_train
 
 import umap
 
+import gradio as gr
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -550,9 +552,10 @@ def get_team_name_mapping(preprocessed_dir):
     return {name: i for i, name in enumerate(unique_teams)}
 
 
-def generate_fusion_gradio(team_names, team_a, team_b, alpha):
+def generate_fusion_gradio(team_a, team_b, alpha):
     # Main backend function for the GUI
     # Takes list of team names, team a and b, and the alpha and returns interpolated image
+    team_names = get_team_name_mapping(OUTPUT_PATH)
     idx_a = team_names[team_a]
     idx_b = team_names[team_b]
     centroid_a = centroids[idx_a]
@@ -639,3 +642,25 @@ if __name__ == "__main__":
     combined_img = generate_combined_img(vae_model, z)
     plt.imshow(combined_img)
     plt.show()
+
+    # gui_vae_model = VAE(IMG_SIZE, latent_dim)
+    gui_vae_model = VAE_large(IMG_SIZE, latent_dim)
+    gui_vae_model.load_state_dict(torch.load("model_checkpoints/model_weights_249.pt"))
+    gui_vae_model.eval()
+
+    team_names = get_team_name_mapping(OUTPUT_PATH)
+    team_list = list(team_names.keys())
+
+    demo = gr.Interface(
+        fn=generate_fusion_gradio,
+        inputs=[
+            gr.Dropdown(choices=team_list, label="Team A"),
+            gr.Dropdown(choices=team_list, label="Team B"),
+            gr.Slider(minimum=0, maximum=1, value=0.5, label="Blend (0=Team A, 1=Team B)")
+        ],
+        outputs=gr.Image(label="Fused Logo"),
+        title="EPL Logo Fusion"
+    )
+
+    demo.launch(share=True)
+
