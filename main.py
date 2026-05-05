@@ -271,9 +271,12 @@ def train(model, train_loader, val_loader, optimizer, epochs, scheduler, beta=1.
             optimizer.zero_grad()
             images = batch[0].to(device)
             (reconstruction, mu, log_var) = model(images)
-            recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, images)
+            recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, images, reduction='sum')
             kl_loss = -0.5 * torch.mean(torch.sum(1 + log_var - torch.square(mu) - torch.exp(log_var), dim=1)) # torch.mean makes sure scale does not change across batches
-            train_loss = recon_loss + beta * kl_loss
+            if epoch <= 25:
+              train_loss = recon_loss
+            else:
+              train_loss = recon_loss + beta * kl_loss
             
             train_loss.backward()
             optimizer.step()
@@ -291,9 +294,12 @@ def train(model, train_loader, val_loader, optimizer, epochs, scheduler, beta=1.
             for batch in val_loader:
                 images = batch[0].to(device)
                 (reconstruction, mu, log_var) = model(images)
-                recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, images)
+                recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, images, reduction='sum')
                 kl_loss = -0.5 * torch.mean(torch.sum(1 + log_var - torch.square(mu) - torch.exp(log_var), dim=1))
-                val_loss = recon_loss + beta * kl_loss
+                if epoch <= 25:
+                  val_loss = recon_loss
+                else:
+                  val_loss = recon_loss + beta * kl_loss
                 total_val_loss += val_loss.item()
             
 
