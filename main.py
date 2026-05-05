@@ -253,6 +253,87 @@ class VAE(torch.nn.Module):
         reconstructed_img = self.decoder(z)
         return (reconstructed_img, mu, log_var)
 
+class Encoder_large(torch.nn.Module):
+    def __init__(self, img_size, latent_dim) -> None:
+        super().__init__()
+        self.img_size = img_size
+        self.latent_dim = latent_dim
+        self.conv1 = torch.nn.Conv2d(in_channels=3,out_channels=64, kernel_size=3, stride=2, padding=1)
+        self.conv2 = torch.nn.Conv2d(in_channels=64,out_channels=128, kernel_size=3, stride=2, padding=1)
+        self.conv3 = torch.nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=2, padding=1)
+        self.conv4 = torch.nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=2, padding=1)
+        self.activation = torch.nn.ReLU()
+        self.flatten = torch.nn.Flatten(start_dim=1) # Flatten from (batch_size,256, 8, 8) to (batch_size, 16384)
+        self.mu = torch.nn.Linear(32768, self.latent_dim)
+        self.log_var = torch.nn.Linear(32768, self.latent_dim)
+    
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.activation(x)
+        x = self.conv2(x)
+        x = self.activation(x)
+        x = self.conv3(x)
+        x = self.activation(x)
+        x = self.conv4(x)
+        x = self.activation(x)
+        x = self.flatten(x)
+        mu = self.mu(x)
+        log_var = self.log_var(x)
+        return mu, log_var
+
+class Decoder_large(torch.nn.Module):
+    def __init__(self, img_size, latent_dim):
+        super().__init__()
+        self.img_size = img_size
+        self.latent_dim = latent_dim
+        self.relu = torch.nn.ReLU()
+        self.sigmoid = torch.nn.Sigmoid()
+        self.linear1 = torch.nn.Linear(self.latent_dim, 32768)
+        self.up_sample1 = torch.nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.conv1 = torch.nn.Conv2d(in_channels=512, out_channels=256, kernel_size=3, padding=1)
+        self.up_sample2 = torch.nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.conv2 = torch.nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, padding=1)
+        self.up_sample3 = torch.nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.conv3 = torch.nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1)
+        self.up_sample4 = torch.nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.conv4 = torch.nn.Conv2d(in_channels=64, out_channels=3, kernel_size=3, padding=1)
+    
+    def forward(self, x):
+        x = self.linear1(x)
+        x = x.view(-1, 256, 8, 8) # Reshape from (batch_size, 16384) to (batch_size, 256, 8, 8)
+        x = self.up_sample1(x)
+        x = self.conv1(x)
+        x = self.relu(x)
+        x = self.up_sample2(x)
+        x = self.conv2(x)
+        x = self.relu(x)
+        x = self.up_sample3(x)
+        x = self.conv3(x)
+        x = self.relu(x)
+        x = self.up_sample4(x)
+        x = self.conv4(x)
+        x = self.sigmoid(x)
+        return x
+
+class VAE_large(torch.nn.Module):
+    def __init__(self, img_size, latent_dim):
+        super().__init__()
+        self.img_size = img_size
+        self.latent_dim = latent_dim
+        self.encoder = Encoder_large(self.img_size, self.latent_dim)
+        self.decoder = Decoder_large(self.img_size, self.latent_dim)
+    
+    def reparameterize(self, mu, log_var):
+        epsilon = torch.randn_like(mu) # epsilon as random value sampled from a normal distribution in the shape of mu
+        std = torch.exp(0.5 * log_var)
+        z = mu + epsilon * std
+        return z
+    
+    def forward(self, x):
+        mu, log_var = self.encoder(x)
+        z = self.reparameterize(mu, log_var)
+        reconstructed_img = self.decoder(z)
+        return (reconstructed_img, mu, log_var)
 
 def train(model, train_loader, val_loader, optimizer, epochs, scheduler, beta=1.0, checkpoint_every=5, report_to_ray=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -347,7 +428,8 @@ def train_trial(config, data_path, img_size, epochs):
     (train_paths, val_paths) = split_train_val(data_path, 0.2)
     (train_loader, val_loader) = build_dataloaders(train_paths, val_paths, batch_size)
 
-    vae_model = VAE(img_size, latent_dim)
+    # vae_model = VAE(img_size, latent_dim)
+    vae_model = VAE_large(img_size, latent_dim)
 
     optimizer = torch.optim.Adam(vae_model.parameters(),lr)
 
