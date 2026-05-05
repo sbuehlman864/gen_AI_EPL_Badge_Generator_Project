@@ -229,7 +229,7 @@ class Decoder(torch.nn.Module):
         x = self.relu(x)
         x = self.up_sample4(x)
         x = self.conv4(x)
-        x = self.sigmoid(x)
+        x = self.sigmoid(x) # Sigmoid to have outputs from 0 to 1
         return x
 
 
@@ -258,12 +258,12 @@ class Encoder_large(torch.nn.Module):
         super().__init__()
         self.img_size = img_size
         self.latent_dim = latent_dim
-        self.conv1 = torch.nn.Conv2d(in_channels=3,out_channels=64, kernel_size=3, stride=2, padding=1)
+        self.conv1 = torch.nn.Conv2d(in_channels=3,out_channels=64, kernel_size=3, stride=2, padding=1) # Simply scaling by 2x from first VAE architecture
         self.conv2 = torch.nn.Conv2d(in_channels=64,out_channels=128, kernel_size=3, stride=2, padding=1)
         self.conv3 = torch.nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=2, padding=1)
         self.conv4 = torch.nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=2, padding=1)
         self.activation = torch.nn.ReLU()
-        self.flatten = torch.nn.Flatten(start_dim=1) # Flatten from (batch_size,256, 8, 8) to (batch_size, 16384)
+        self.flatten = torch.nn.Flatten(start_dim=1) # Flatten from (batch_size,512, 8, 8) to (batch_size, 32768)
         self.mu = torch.nn.Linear(32768, self.latent_dim)
         self.log_var = torch.nn.Linear(32768, self.latent_dim)
     
@@ -336,24 +336,29 @@ class VAE_large(torch.nn.Module):
         return (reconstructed_img, mu, log_var)
 
 def train(model, train_loader, val_loader, optimizer, epochs, scheduler, beta=1.0, checkpoint_every=5, report_to_ray=False):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Put model on available GPU
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
 
     model = model.to(device)
 
     train_losses = []
     val_losses = []
 
+    # Make directory to save model weights
     Path("model_checkpoints").mkdir(exist_ok=True)
 
     for epoch in range(epochs):
         total_train_loss = 0
+        # Model training
         model.train()
         for batch in train_loader:
             optimizer.zero_grad()
             images = batch[0].to(device)
             (reconstruction, mu, log_var) = model(images)
-            recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, images, reduction='sum')
+            recon_loss = torch.nn.functional.binary_cross_entropy(reconstruction, images, reduction='sum') # Use sum reduction to discourage posterior collapse
             kl_loss = -0.5 * torch.mean(torch.sum(1 + log_var - torch.square(mu) - torch.exp(log_var), dim=1)) # torch.mean makes sure scale does not change across batches
+
+            # KL annealing to focus on reconstruction loss for first 100 epochs
             if epoch <= 100:
               train_loss = recon_loss
             else:
@@ -362,13 +367,14 @@ def train(model, train_loader, val_loader, optimizer, epochs, scheduler, beta=1.
             train_loss.backward()
             optimizer.step()
 
-            
-
             total_train_loss += train_loss.item()
         
+        # Save model weights every so many epochs
         if checkpoint_every > 0:
             if (epoch + 1) % checkpoint_every == 0:
                     torch.save(model.state_dict(), f"model_checkpoints/model_weights_{epoch}.pt") # Save model weights every checkpoint_every epochs
+
+        # Model validation
         total_val_loss = 0
         model.eval()
         with torch.no_grad():
@@ -388,11 +394,12 @@ def train(model, train_loader, val_loader, optimizer, epochs, scheduler, beta=1.
         train_losses.append(total_train_loss / len(train_loader)) # save average train losses per epoch
         val_losses.append(total_val_loss / len(val_loader)) # save average validation losses per epoch
 
+        # Report validation loss to hyperband tuning if in tuning mode
         if report_to_ray:
             ray.tune.report({"val_loss": total_val_loss / len(val_loader)})
 
         else:
-            
+            # Learning rate scheduler to encourage learning after plateau
             if scheduler is not None:
                 scheduler.step(total_val_loss / len(val_loader))
 
@@ -410,6 +417,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, scheduler, beta=1.
 # Step 3: Hyperband Hyperparameter Tuning
 # ---------------------------------------------------------------------------
 def define_search_space():
+    # Parameter space for Hyperband to search
     config = {
         "latent_dim": tune.choice([64, 128, 256, 512]),
         "beta": tune.uniform(1e-5, 0.1),
@@ -420,6 +428,7 @@ def define_search_space():
 
 
 def train_trial(config, data_path, img_size, epochs):
+    # Set up the parameters, data, and model variables for hyperband (run training)
     latent_dim = config["latent_dim"]
     beta = config["beta"]
     lr = config["lr"]
@@ -440,6 +449,7 @@ def train_trial(config, data_path, img_size, epochs):
 
 
 def run_hyperband(num_samples, max_epochs, reduction_factor, data_path, img_size):
+    # Scheduler for running hyperband
     scheduler = ray.tune.schedulers.HyperBandScheduler(
         time_attr="training_iteration",
         max_t=max_epochs,
@@ -447,6 +457,7 @@ def run_hyperband(num_samples, max_epochs, reduction_factor, data_path, img_size
         metric="val_loss",
         mode="min"
     )
+    # Tuner takes care of parameter setting and tweaks as trials iterate
     tuner = tune.Tuner(
         tune.with_parameters(train_trial, data_path=data_path, img_size=img_size, epochs=max_epochs),
         param_space=define_search_space(),
@@ -456,10 +467,12 @@ def run_hyperband(num_samples, max_epochs, reduction_factor, data_path, img_size
     for result in results:
         if result.error:
             print(f"Trial error: {result.error}")
+    # Return best results given from the tuner trials
     return results.get_best_result(metric="val_loss", mode="min", filter_nan_and_inf=False)
 
 
 def save_best_hparams(best_config, output_path):
+    # Save the best parameters to json file
     best_config = best_config.config
 
     with open(output_path, "w") as file:
@@ -471,6 +484,7 @@ def save_best_hparams(best_config, output_path):
 # ---------------------------------------------------------------------------
 
 def encode_train_images(model, train_loader):
+    # Encode the training images in latent space using mu values
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.eval()
 
@@ -489,6 +503,7 @@ def encode_train_images(model, train_loader):
     return (mus, labels)
 
 def compute_centroids(mus, labels):
+    # Find the centroids in latent space for each team label
     unique_labels = np.unique(labels)
     centroids = {}
 
@@ -499,6 +514,7 @@ def compute_centroids(mus, labels):
     return centroids
 
 def umap_visual(mus, labels):
+    # Visualize latent map
     embedding = umap.UMAP(n_components=2).fit_transform(mus) # Reduce latent dimension down to 2D, shape of (num_images, 2)
     plt.figure(figsize=(10, 8))
     plt.scatter(embedding[:, 0], embedding[:, 1], c=labels, cmap='tab20', s=5)
@@ -509,10 +525,12 @@ def umap_visual(mus, labels):
     plt.show()
 
 def interpolate_centroids(centroid_a, centroid_b, alpha=0.5):
+    # Latent space exploration calculation to retrieve interpolated representation
     z = (1 - alpha) * centroid_a + alpha * centroid_b
     return z
 
 def generate_combined_img(model, z):
+    # Run z through decoder and convert to numpy for visualization
     z = torch.tensor(z, dtype=torch.float32) # Convert from np array to torch tensor
     z = z.unsqueeze(0) # Unsqueeze to shape (batch_size, latent_dim)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -526,10 +544,6 @@ def generate_combined_img(model, z):
 # Step 5: GUI
 # ---------------------------------------------------------------------------
 
-
-# ---------------------------------------------------------------------------
-# Step 6: Evaluation and Presentation of Results
-# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
