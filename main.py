@@ -331,7 +331,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, scheduler, beta=1.
 def define_search_space():
     config = {
         "latent_dim": tune.choice([64, 128, 256, 512]),
-        "beta": tune.uniform(0.5, 5.0),
+        "beta": tune.uniform(1e-5, 0.1),
         "lr": tune.loguniform(1e-4, 1e-2),
         "batch_size": tune.choice([16, 32, 64])
     }
