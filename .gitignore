@@ -10,3 +10,7 @@ preprocessed_imgs/
 # Docs
 main_description.md
 PROJECT_PLAN.md
+
+
+# Take out main.py since using notebook as final
+main.py
